@@ -21,7 +21,7 @@ from .engine.ai_layer import rank_and_explain, clear_rank_cache
 from .engine.data_loader import (FILES, REPEATABLE_EVENT_IDS, load_dataset, load_dataset_bytes,
                                  merge_additional_dataset, DataValidationError)
 from .engine.navigator import employee_state, recommendations, eligibility, hr_overview
-from .importing import MAX_FILE_BYTES, dataset_files, read_zip
+from .importing import MAX_FILE_BYTES, read_zip
 from .repository import Repository
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -389,20 +389,20 @@ def create_app(data_dir=None, database_path=None, auth_secret=None, as_of_date=N
         return {'import_id':state['import']['import_id'],'as_of_date':current_data().as_of_date.isoformat(),'counts':current_data().counts}
 
     @app.post('/api/hr/import')
-    async def import_data(request:Request, mode:str=Form('replace'),employees:UploadFile|None=File(None),
+    def import_data(request:Request, mode:str=Form('replace'),employees:UploadFile|None=File(None),
             events:UploadFile|None=File(None),skills:UploadFile|None=File(None),history:UploadFile|None=File(None),
             dataset_zip:UploadFile|None=File(None),session=Depends(hr)):
-        async def read_file(upload):
-            content=await upload.read(MAX_FILE_BYTES+1)
+        def read_file(upload):
+            content=upload.file.read(MAX_FILE_BYTES+1)
             if len(content)>MAX_FILE_BYTES: raise HTTPException(422,'Файл превышает 12 МБ')
             return content
         raw={}
         if dataset_zip:
-            try: raw=read_zip(await read_file(dataset_zip))
+            try: raw=read_zip(read_file(dataset_zip))
             except (ValueError,OSError) as exc: raise HTTPException(422,str(exc)) from None
         else:
             for name,upload in [('employees.json',employees),('events.json',events),('skills.json',skills),('activity_history.csv',history)]:
-                if upload: raw[name]=await read_file(upload)
+                if upload: raw[name]=read_file(upload)
         if mode not in ('append','replace'): raise HTTPException(422,'Выберите replace или append')
         required=FILES if mode=='replace' else ('employees.json','activity_history.csv')
         if not all(name in raw for name in required): raise HTTPException(422,'Загрузите все обязательные файлы')
@@ -410,7 +410,7 @@ def create_app(data_dir=None, database_path=None, auth_secret=None, as_of_date=N
             same_import(session)
             if mode=='append':
                 data=merge_additional_dataset(current_data(),raw['employees.json'],raw['activity_history.csv'])
-                raw=dataset_files(data)
+                raw=data.raw_bytes
             data=load_dataset_bytes(raw,as_of_override=snapshot_override)
             if data.manifest==current_data().manifest and data.as_of_date==current_data().as_of_date:
                 raise HTTPException(409,'Этот набор уже активен')

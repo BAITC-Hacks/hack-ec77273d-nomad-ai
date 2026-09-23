@@ -30,6 +30,15 @@ def dataset_bytes():
 
 
 class ImportTests(unittest.TestCase):
+    def test_append_uses_source_snapshot_when_demo_date_is_overridden(self):
+        base = load_dataset_bytes(dataset_bytes(), '2027-01-01')
+        employee = deepcopy(base.employees_by_id['E1'])
+        employee['employee_id'] = 'FUTURE_SCENARIO'
+        merged = merge_additional_dataset(base, json.dumps({'meta': {'as_of_date': '2026-10-01'},
+                                            'employees': [employee]}).encode(), history_bytes([]))
+        self.assertEqual(merged.as_of_date.isoformat(), '2027-01-01')
+        self.assertEqual(json.loads(merged.raw_bytes['skills.json'])['meta']['as_of_date'], '2026-10-01')
+
     def test_additional_unseen_employee_and_history_load(self):
         base = load_dataset_bytes(dataset_bytes())
         employee = deepcopy(base.employees_by_id['E1'])

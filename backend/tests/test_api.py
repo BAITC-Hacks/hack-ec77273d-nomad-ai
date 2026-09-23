@@ -1,6 +1,8 @@
 """Risk-focused integration tests with isolated SQLite and synthetic starter-kit data."""
 from copy import deepcopy
 import json
+import io
+import zipfile
 from pathlib import Path
 import tempfile
 import unittest
@@ -120,6 +122,34 @@ class APITests(unittest.TestCase):
         self.assertEqual(ai['mode'],'fallback')
         self.assertEqual(ai['fallback_reason'],'disabled')
         self.assertEqual(ai['recommendations'],local['recommendations'])
+
+    def test_zip_replacement_invalidates_other_sessions_and_persists_snapshot(self):
+        other=TestClient(self.app)
+        self.addCleanup(other.close)
+        self.login(client=other)
+        self.login(role='hr')
+        bad=self.client.post('/api/hr/import',data={'mode':'replace'},
+                             files={'dataset_zip':('bad.zip',b'not zip','application/zip')})
+        self.assertEqual(bad.status_code,422)
+        changed=deepcopy(self.raw)
+        employees=json.loads(changed['employees.json'])
+        for index,row in enumerate(employees['employees']): row['employee_id']=f'NEW_{index}'
+        changed['employees.json']=json.dumps(employees).encode()
+        buffer=io.BytesIO()
+        with zipfile.ZipFile(buffer,'w') as archive:
+            for name,blob in changed.items(): archive.writestr('starter/'+name,blob)
+        response=self.client.post('/api/hr/import',data={'mode':'replace'},
+                   files={'dataset_zip':('starter.zip',buffer.getvalue(),'application/zip')})
+        self.assertEqual(response.status_code,200,response.text)
+        self.assertIsNone(self.client.get('/api/session').json()['employee_id'])
+        self.assertEqual(other.get('/api/me').status_code,409)
+        # A restart restores the validated imported files rather than the original kit.
+        reopened=create_app(database_path=self.root/'test.sqlite3',auth_secret='synthetic-test-secret')
+        with TestClient(reopened) as client:
+            reply=client.post('/api/login',json={'actor_role':'employee','employee_id':'NEW_0',
+                  'access_code':reopened.state.access.employee_code('NEW_0')})
+            self.assertEqual(reply.status_code,200)
+            self.assertEqual(client.get('/api/me').json()['employee']['employee_id'],'NEW_0')
 
     def test_hr_observes_confirmed_employee_progress(self):
         self.login()

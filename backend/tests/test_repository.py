@@ -25,6 +25,18 @@ class RepositoryTests(unittest.TestCase):
         self.repo.initialize()
         self.assertEqual(self.import_id, self.repo.register_import(**self.import_args)['import_id'])
 
+    def test_version_two_upgrade_preserves_journal_and_enables_employee_state(self):
+        with self.repo.connect() as connection:
+            connection.execute('PRAGMA user_version = 2')
+        self.repo.initialize()
+        self.assertEqual(self.repo.get_session(self.token)['employee_id'], 'E1')
+        self.repo.complete_employee(self.import_id, 'E1', event_id='EV_TEST', idempotency_key='new',
+                                   expected_revision=0, as_of_date='2026-10-01')
+        state = self.repo.progress_state(self.import_id, 'E1')
+        self.assertEqual(state['revision'], 1)
+        self.assertEqual(len(state['completions']), 1)
+        self.assertEqual(self.import_id, self.repo.register_import(**self.import_args)['import_id'])
+
     def test_duplicate_completion_and_idempotent_retry(self):
         first = self.complete(idempotency_key='request-1')
         self.assertEqual(first, self.complete(idempotency_key='request-1'))

@@ -278,13 +278,16 @@ def load_dataset_bytes(raw, as_of_override=None):
 
 def merge_additional_dataset(base, employees_bytes, history_bytes):
     """Append raw profiles and histories; reject collisions rather than overwrite progress."""
+    # A scenario date override does not change the date of the imported assessment snapshot.
+    source_meta = (_decode(base.raw_bytes['skills.json'], 'skills.json')['meta']
+                   if base.raw_bytes else base.meta)
     extra = _decode(employees_bytes, 'employees.json')
     if isinstance(extra, list):
-        extra = {'meta': {'as_of_date': base.meta['as_of_date']}, 'employees': extra}
+        extra = {'meta': {'as_of_date': source_meta['as_of_date']}, 'employees': extra}
     if not isinstance(extra, dict) or not isinstance(extra.get('employees'), list):
         _fail('employees.json', 'Expected starter-kit employees wrapper or profile array')
     if 'meta' in extra and (not isinstance(extra['meta'], dict) or
-                           extra['meta'].get('as_of_date') != base.meta['as_of_date']):
+                           extra['meta'].get('as_of_date') != source_meta['as_of_date']):
         _fail('employees.json.meta.as_of_date', 'Additional profiles must use the active snapshot date')
     extra_rows = [_validate(RawEmployee, row, f'employees[{i}]') for i, row in enumerate(extra['employees'])]
     for index, row in enumerate(extra_rows):
@@ -299,8 +302,8 @@ def merge_additional_dataset(base, employees_bytes, history_bytes):
     raw = dict(base.raw_bytes)
     for name, key, values in [('employees.json', 'employees', list(base.employees_by_id.values()) + extra_rows),
                               ('events.json', 'events', list(base.events_by_id.values()))]:
-        raw[name] = json.dumps({'meta': base.meta, key: values}, ensure_ascii=False).encode()
-    raw['skills.json'] = json.dumps({'meta': base.meta, 'skills': list(base.skills_by_id.values()),
+        raw[name] = json.dumps({'meta': source_meta, key: values}, ensure_ascii=False).encode()
+    raw['skills.json'] = json.dumps({'meta': source_meta, 'skills': list(base.skills_by_id.values()),
         'role_profiles': list(base.role_profiles_by_key.values()), 'proficiency_scale': base.proficiency_scale},
         ensure_ascii=False).encode()
     raw['activity_history.csv'] = output.getvalue().encode()
