@@ -41,11 +41,27 @@ class Repository:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.connect() as connection:
             version = connection.execute('PRAGMA user_version').fetchone()[0]
-            if version not in (0, 1):
+            if version not in (0, 1, 2):
                 raise ValueError(f'Unsupported database version: {version}')
             connection.execute('PRAGMA journal_mode = WAL')
             if version == 0:
                 connection.executescript(Path(__file__).with_name('schema.sql').read_text())
+            elif version == 1:
+                # Version 2 adds saved plan snapshots; keep existing journal rows.
+                connection.execute('BEGIN IMMEDIATE')
+                try:
+                    connection.execute('''CREATE TABLE IF NOT EXISTS development_plans (
+                        plan_id TEXT PRIMARY KEY,
+                        import_id TEXT NOT NULL REFERENCES imports(import_id),
+                        employee_id TEXT NOT NULL,
+                        result_json TEXT NOT NULL CHECK(json_valid(result_json)),
+                        created_at TEXT NOT NULL
+                    )''')
+                    connection.execute('PRAGMA user_version = 2')
+                    connection.commit()
+                except Exception:
+                    connection.rollback()
+                    raise
 
     def register_import(self, *, as_of_date, manifest, counts):
         """Register a successfully validated dataset, storing only hashes/counts.

@@ -2,12 +2,21 @@
 
 import os
 from pathlib import Path
+from typing import Any
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.responses import FileResponse
+from pydantic import BaseModel, ConfigDict
+from dotenv import load_dotenv
 
 from .engine.data_loader import load_dataset
 from .repository import Repository
 from .schemas import HealthResponse, ImportResponse
+
+# Load project-local provider settings before the AI adapter reads os.environ.
+load_dotenv(Path(__file__).resolve().parents[2] / ".env", override=False)
+
+from .engine.ai_layer import rank_and_explain
 
 
 def _paths():
@@ -31,6 +40,33 @@ def _paths():
 data_dir, database_path = _paths()
 repository = Repository(database_path)
 app = FastAPI(title="Nomad AI API", version="1.0.0")
+
+
+class AITestRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    role: str
+    grade: str
+    target: dict[str, Any]
+    facts: list[dict[str, str]]
+    routes: list[dict[str, str]]
+    rerankable_route_ids: list[str]
+    employee_id: str | None = None
+    revision: int | None = None
+
+
+@app.get("/admin/ai")
+def ai_admin_console():
+    return FileResponse(Path(__file__).with_name("static") / "ai_admin.html")
+
+
+@app.post("/api/admin/ai-test")
+def ai_admin_test(payload: AITestRequest, request: Request):
+    # This development console runs on loopback. Do not expose the prototype API publicly.
+    if request.client and request.client.host not in {"127.0.0.1", "::1", "testclient"}:
+        raise HTTPException(status_code=403, detail="Admin console is local only")
+    facts = payload.model_dump(exclude_none=True)
+    result = rank_and_explain(facts)
+    return result
 
 
 @app.on_event("startup")

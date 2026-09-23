@@ -42,5 +42,14 @@ CREATE TABLE IF NOT EXISTS demo_completions (
 CREATE INDEX IF NOT EXISTS demo_history_order
     ON demo_completions(session_id, date, completion_id);
 
-PRAGMA user_version = 1;
+-- Saved plan snapshots are additive; source employee data remains external.
+CREATE TABLE IF NOT EXISTS development_plans (
+    plan_id TEXT PRIMARY KEY,
+    import_id TEXT NOT NULL REFERENCES imports(import_id),
+    employee_id TEXT NOT NULL,
+    result_json TEXT NOT NULL CHECK(json_valid(result_json)),
+    created_at TEXT NOT NULL
+);
+
+PRAGMA user_version = 2;
 COMMIT;

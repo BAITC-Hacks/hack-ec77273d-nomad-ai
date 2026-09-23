@@ -27,8 +27,8 @@ python -m unittest discover -s tests -t .. -v
 The first command creates `var/nomad.sqlite3`. The second validates the starter
 kit and records its SHA-256 manifest, counts and snapshot date. Repeating either
 command is safe. `--database` or the `DATABASE_PATH` environment variable changes
-the SQLite path. `.env.example` documents configuration; this script does not
-automatically load `.env`.
+the SQLite path. The API loads project-root `.env` at startup; the database
+initializer does not load it automatically.
 
 Obtain the starter kit from the hackathon organizers inside the private working
 environment and put these four files in `data/`: `employees.json`, `events.json`,
@@ -48,7 +48,8 @@ The source kit cannot be reproduced outside the event without organizer access.
 
 Schema: `backend/app/schema.sql`; Python access: `backend/app/repository.py`.
 Connections enable foreign keys, transactions and a busy timeout; initialization
-enables WAL. Schema version is `PRAGMA user_version = 1`; unknown versions fail.
+enables WAL. Schema version is `PRAGMA user_version = 2`; version 1 is upgraded
+transactionally by adding the saved-plan table, and newer unknown versions fail.
 Tokens are returned once and only their SHA-256 hash is stored. Wall-clock UTC
 is used for token expiry and audit timestamps, never for learning calculations.
 Demo completions use the import snapshot date (`2026-10-01` for this kit).
@@ -83,6 +84,25 @@ Read endpoints include `/api/health`, `/api/import`, `/api/employees`,
 `/api/events`, `/api/events/{event_id}`, `/api/skills` and `/api/role-profiles`.
 This prototype API is for the closed local hackathon environment; do not expose
 it publicly because these endpoints return employee profile and history data.
+
+## AI adapter lab
+
+Start the local API, then open `http://127.0.0.1:8000/admin/ai`. The console
+submits an editable, synthetic fact set to `POST /api/admin/ai-test`. Select a
+provider in the local `.env` with `AI_PROVIDER=none`, `openai`, `nvidia`, or
+`openai-compatible`; provide its model and key through server environment
+variables. For `openai-compatible`, set `AI_BASE_URL` to the chat completions
+endpoint. Provider credentials are never sent to the browser. The adapter makes
+one request with a six-second timeout and falls back with a reason when disabled,
+unavailable, or given invalid output. Only a successful validated response is
+reported as `mode: llm`. The admin test endpoint accepts synthetic test cases and
+is restricted to loopback; keep this prototype API bound to localhost.
+
+The new `rank_and_explain(facts)` adapter is additive beside the current planner
+adapter. It caches by employee, revision, target, complete facts and model
+configuration for five minutes, never on employee identity alone. The shared
+contract section was not changed because it requires agreement from all three
+participants before edits.
 
 ## Integration boundary
 
