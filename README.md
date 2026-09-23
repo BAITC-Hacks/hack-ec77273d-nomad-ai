@@ -1,139 +1,192 @@
-# Nomad AI — local database
+﻿# Career Quest — карьерный навигатор
 
-SQLite is a local journal of sessions, validated imports and demo completions.
-The private JSON/CSV starter kit remains the source of employees, events, skills,
-role requirements and participation history. No external database service or
-third-party Python dependency is needed for this storage layer.
+Рабочее локальное приложение для HackAlem AI / Halyk Bank: профиль сотрудника,
+проверяемые сценарии обучения, история, демо-подтверждение выполнения и HR-аналитика.
+Интерфейс на русском; названия и описания каталога сохраняют исходный язык.
+Полная казахская локализация не заявляется.
 
-## Initialize
+Правила взяты из `backend/Dataset/README.md` и предоставленного текста задания.
+DOCX и архив `career_quest_dataset.zip` в переданной рабочей папке отсутствовали:
+соответствие их неизвестному содержимому не утверждается. Распакованные четыре
+файла датасета присутствуют и проверены: 200 сотрудников, 40 активностей,
+60 навыков, 32 профиля требований, 2743 записи истории. Новые ID поддерживаются.
 
-Run from either the repository root or the `backend` directory (Python 3.10+).
-From the repository root:
+## Запуск одной командой
+
+Из корня проекта, Windows + Python 3.10 или новее:
 
 ```powershell
-python scripts/init_db.py
-python scripts/init_db.py --data-dir data
-python -m unittest discover -s backend/tests -v
+powershell -ExecutionPolicy Bypass -File .\scripts\start.ps1
 ```
 
-From `backend`:
+Скрипт создаёт `.venv` при необходимости, устанавливает `backend/requirements.txt`
+и запускает сервер на **http://127.0.0.1:8000**. При уже установленных зависимостях:
 
 ```powershell
-python scripts/init_db.py
-python scripts/init_db.py --data-dir Dataset
-python -m unittest discover -s tests -t .. -v
-```
-
-The first command creates `var/nomad.sqlite3`. The second validates the starter
-kit and records its SHA-256 manifest, counts and snapshot date. Repeating either
-command is safe. `--database` or the `DATABASE_PATH` environment variable changes
-the SQLite path. The API loads project-root `.env` at startup; the database
-initializer does not load it automatically.
-
-Obtain the starter kit from the hackathon organizers inside the private working
-environment and put these four files in `data/`: `employees.json`, `events.json`,
-`skills.json`, `activity_history.csv`. If `data/` is empty and all four files are
-already in `backend/Dataset`, `--data-dir data` automatically uses `backend/Dataset`.
-You can also pass `--data-dir backend/Dataset` explicitly.
-Do not publish these source files or send full profiles to external services.
-The source kit cannot be reproduced outside the event without organizer access.
-
-## Storage
-
-| Table | Purpose |
-| --- | --- |
-| `imports` | Dataset fingerprint, file hashes, counts, `meta.as_of_date` |
-| `sessions` | Hashed opaque tokens, employee/HR role, dataset binding, expiry/revocation |
-| `demo_completions` | Session-local completion overlay, scheduled session reference, continuation record, retry key |
-
-Schema: `backend/app/schema.sql`; Python access: `backend/app/repository.py`.
-Connections enable foreign keys, transactions and a busy timeout; initialization
-enables WAL. Schema version is `PRAGMA user_version = 2`; version 1 is upgraded
-transactionally by adding the saved-plan table, and newer unknown versions fail.
-Tokens are returned once and only their SHA-256 hash is stored. Wall-clock UTC
-is used for token expiry and audit timestamps, never for learning calculations.
-Demo completions use the import snapshot date (`2026-10-01` for this kit).
-Each login has its own demo overlay; logging in again starts a separate demo.
-
-`load_dataset(path)` in `backend/app/engine/data_loader.py` unwraps source files,
-validates identifiers and references and builds `employees_by_id`, `events_by_id`,
-`role_profiles_by_key`, `skills_by_id`, `history_by_employee`. History is ordered
-by `(date, record_id)`; missing optional feedback stays `None`. Counts are checked
-by inspection, not hardcoded, so additional evaluation profiles can be loaded.
-The base kit contains 200 employees, 40 events, 60 skills, 32 profiles and 2743
-history records.
-
-## Start the API
-
-Install the backend dependencies and run from the repository root:
-
-```powershell
-.\.venv\Scripts\python.exe -m pip install -r backend\requirements.txt
 .\.venv\Scripts\python.exe scripts\run.py
 ```
 
-The API starts at `http://127.0.0.1:8000`; interactive API docs are at
-`http://127.0.0.1:8000/docs`. Startup initializes `var/nomad.sqlite3`, validates
-the source kit, and registers its hashes/counts and `meta.as_of_date`. Set
-`DATA_DIR` or `DATABASE_PATH` to use different local paths. The API loads data
-from `data/`, falling back to `backend/Dataset/` when the four required files
-are present there.
+Конфигурация загружается из корневого `.env` (не коммитится). Пример —
+[.env.example](.env.example). Существующие переменные окружения имеют приоритет.
+При первом запуске скрипт добавляет отсутствующий `AUTH_SECRET` в локальный `.env`.
+Дата сценария берётся из `meta.as_of_date` — **2026-10-01**. `AS_OF_DATE` позволяет
+задать более позднюю дату; вернуться до даты исходного snapshot нельзя.
 
-Read endpoints include `/api/health`, `/api/import`, `/api/employees`,
-`/api/employees/{employee_id}`, `/api/employees/{employee_id}/history`,
-`/api/events`, `/api/events/{event_id}`, `/api/skills` and `/api/role-profiles`.
-This prototype API is for the closed local hackathon environment; do not expose
-it publicly because these endpoints return employee profile and history data.
+## Вход и роли
 
-The local frontend has separate pages at `/employee`, `/hr` and `/boss`. The
-employee page opens one profile by employee ID; HR can browse the directory and
-open each person's plan; the boss page shows organization totals and learning
-activity. Each person plan shows up to three available routes with their actual
-course steps. These are presentation routes for the localhost demo, not an
-authenticated production authorization system. The routes API is
-`/api/employees/{employee_id}/routes`; organization aggregates are at
-`/api/hr/overview`.
+После старта откройте локальный **`var/demo_accounts.json`**: это коды доступа
+к синтетическим демо-профилям и отдельный код HR. Файл игнорируется Git и никогда
+не раздаётся HTTP-сервером. Выберите роль и введите код в форме входа.
+Для HR ID сотрудника необязателен; указав свой ID, HR получает также личный маршрут.
+Коды можно переопределить через `HR_ACCESS_CODE` и `EMPLOYEE_ACCESS_CODES` в окружении.
 
-## AI adapter lab
+Серверные сессии хранят хеш токена в SQLite; браузер получает HttpOnly/SameSite cookie.
+Сотрудник видит только собственные профиль, рекомендации и историю. Запрос чужого
+ID или HR-API возвращает 403. HR имеет доступ к агрегатам, списку сотрудников,
+профилям и импорту. `/boss` открывает HR-обзор с теми же проверками прав, не отдельную
+непроверяемую привилегию. Это локальная система демо-кодов, а не интеграция банковского SSO.
 
-Start the local API, then open `http://127.0.0.1:8000/admin/ai`. The console
-submits an editable, synthetic fact set to `POST /api/admin/ai-test`. Select a
-provider in the local `.env` with `AI_PROVIDER=none`, `openai`, `nvidia`, or
-`openai-compatible`; provide its model and key through server environment
-variables. For `openai-compatible`, set `AI_BASE_URL` to the chat completions
-endpoint. Provider credentials are never sent to the browser. The adapter makes
-one request with a six-second timeout and falls back with a reason when disabled,
-unavailable, or given invalid output. Only a successful validated response is
-reported as `mode: llm`. The admin test endpoint accepts synthetic test cases and
-is restricted to loopback; keep this prototype API bound to localhost.
+## Основные сценарии
 
-The new `rank_and_explain(facts)` adapter is additive beside the current planner
-adapter. It caches by employee, revision, target, complete facts and model
-configuration for five minutes, never on employee identity alone. The shared
-contract section was not changed because it requires agreement from all three
-participants before edits.
+- **Моё развитие:** текущая роль/грейд, эффективные навыки, требования текущего,
+  следующего и выбранного грейда, критические разрывы и история активности.
+- **Сравнение:** 1–3 варианта первого шага. Каждый маршрут содержит одну или две
+  реальные активности, эффекты до/после, сроки, длительность и факторы выбора.
+  `progress_after` относится к первому шагу; итог маршрута — `steps[-1].coverage_after`.
+- **Цель:** сотрудник выбирает существующий профиль роли/грейда; расчёт обновляется.
+- **Выполнение:** сотрудник явно подтверждает симуляцию завершения в демо.
+  Эффект применяется один раз, версия профиля увеличивается, рекомендации пересчитываются.
+  Подтверждение будущей сессии — условная симуляция, а не запись о реальном посещении.
+- **HR:** разрывы компетенций с корректным знаменателем, сотрудники без следующего
+  шага и причины, уникальные участники/статусы активностей, импорт дополнительных данных.
 
-## Integration boundary
+Активности не присваивают грейд автоматически. Нет публичных рейтингов сотрудников,
+очков за обязательные процессы, принудительных серий или обещаний повышения.
+Числа в интерфейсе всегда берутся из backend, включая при успешной работе модели.
 
-This is the database/data-loading layer, not the recommendation engine or REST API.
-Before creating a session, the API must authenticate the actor and verify the
-employee belongs to the selected dataset. Before writing a demo completion, the
-engine must validate catalog eligibility, source completions, used sessions and
-the latest in-progress record. Pass catalog repeatability to the repository;
-`REPEATABLE_EVENT_IDS` represents the README's EV_036 catalog exception.
-Never accept repeatability or another employee's identity from an untrusted UI.
-SQLite prevents duplicate demo completions/retries; source-history duplication
-must be checked by the engine. The repository does not award points or change grade.
+## Проверяемая логика
 
-For engine integration: missing skill means 0; source levels are at last review.
-Replay only completed rows after review and on/before `as_of_date`, ordered by
-`(date, record_id)`. Apply each catalog effect as
-`max(before, min(before + gain, max_level))`. Self-paced history uses enrollment
-date as an explicitly approximate completion timeline; do not invent
-`completion_date`. Mandatory completions can affect skills but never enter
-recommendations, engagement or points. Coverage, friction, scheduling and route
-utility are derived by the engine, not persisted as authoritative employee data.
+1. Исходные skills отражают последнюю оценку. Только completed после last_review_date
+   и не позднее даты сценария воспроизводятся поверх snapshot. Отсутствующий навык = 0.
+2. Эффект ограничен gain и max_level; активность никогда не уменьшает уже высокий навык.
+   Все реальные эффекты присутствуют в impacts, включая навыки без требования цели.
+3. Исключаются mandatory, неподходящие роль/грейд, нарушенные prerequisites,
+   завершённые неповторяемые активности и события без доступной сессии.
+   `self_paced` доступен без сессий; `EV_036` повторяется только для другой сессии.
+4. Utility учитывает критические разрывы, покрытие требований, эффект, историю
+   формата и длительность. Это не вероятность завершения или повышения.
+   Пропуски не превращаются в рейтинг сотрудника; причины пропусков не выводятся.
+5. Сроки сценария предполагают два часа обучения в день. Для self_paced историческая
+   дата зачисления служит приближением; неизвестная дата фактического окончания не выдумывается.
 
-The private starter kit and SQLite files are ignored by Git. Ignore rules do not
-remove files that were already staged or tracked; check `git diff --cached --name-only`
-before publishing.
+Демо-прогресс сохраняется по `(import_id, employee_id)` и переживает повторный вход
+и перезапуск. Атомарные revision/idempotency-проверки защищают от двойного начисления
+и устаревших подтверждений. Источник JSON/CSV не перезаписывается. SQLite версии 1/2
+обновляется до 3 добавлением таблиц; существующие данные сохраняются.
+
+## Career Navigator и приватность
+
+Один адаптер `rank_and_explain(facts)` в `backend/app/engine/ai_layer.py` выбирает
+порядок среди максимум пяти проверенных вариантов. В модель передаются только роль,
+грейд, цель, разрывы, агрегированные факторы истории, допустимые маршруты и fact_id.
+**ФИО, employee_id, manager_id, сырой CSV и полные профили не передаются.**
+
+Модель возвращает JSON с ID маршрутов и ссылками на факты. Проверяются схема,
+уникальность/существование ID, разрешённые позиции перестановки и минимум три
+категории доказательств (грейд/цель, разрыв, история) для каждого объяснения.
+Свободную прозу невозможно автоматически признать истинной: в UI используются
+короткие шаблоны из проверенных фактов, выбранных моделью. Модель определяет
+ранжирование и факторы; приросты и допуск определяет код.
+
+Провайдер конфигурируется окружением. Пример локального совместимого сервиса:
+
+```dotenv
+AI_PROVIDER=local
+AI_MODEL=имя_установленной_локальной_модели
+AI_BASE_URL=http://127.0.0.1:11434/v1/chat/completions
+```
+
+Модель локального сервиса должна быть установлена отдельно. Поддерживаются также
+`openai`, `nvidia`, `openai-compatible`; используйте `OPENAI_MODEL`/`OPENAI_API_KEY`,
+`NVIDIA_MODEL`/`NVIDIA_API_KEY` или общие `AI_MODEL`/`AI_API_KEY`. Имя модели задаёт
+владелец проекта; код не меняет его автоматически.
+
+Для внешнего контура производные факты допускаются **только** при
+`AI_ALLOW_EXTERNAL_DERIVED=true`, после разрешения организаторов. Без флага работает
+локальный endpoint либо честный fallback `external_not_allowed`. Страница HR
+`/admin/ai` проверяет реальный вызов на фиксированном синтетическом примере сервера;
+никакие поля загруженных сотрудников для этого теста не используются.
+
+Общий таймаут одного вызова — 6 секунд, повторов нет. `mode=llm` возможен только
+после настоящего успешного вызова и валидации; иначе `mode=fallback` и причина.
+Кэш успешных решений ограничен 256 записями/5 минутами и включает employee_id,
+revision, цель, факты, конфигурацию модели и версию prompt. Изменение цели,
+подтверждение выполнения или импорт сбрасывают соответствующие записи.
+
+Профиль и локальные сценарии загружаются независимо от модели. После отображения
+расчёта UI отдельно запрашивает AI и отвергает устаревшие результаты по revision.
+
+## Импорт для жюри
+
+Войдите HR → **Загрузка данных**:
+
+- Дополнение: employees.json (обёртка starter kit или массив сырых профилей) +
+  activity_history.csv. Новые ID не ограничены исходными 200; ссылки/уровни проверяются.
+- Замена: все четыре исходных файла либо ZIP с ними. Нужны employees.json,
+  events.json, skills.json, activity_history.csv с одной датой snapshot.
+
+Проверка выполняется до активации. Неверные ссылки, диапазоны, типы, даты, дубликаты
+и несогласованные статусы дают ошибку с путём поля. Готовый API Employee нельзя
+импортировать как raw snapshot: в нём навыки уже рассчитаны. Неудачный импорт
+не заменяет текущий набор. При успешной замене исходный набор сохраняется локально,
+активируется новая версия; другие сессии должны войти заново. Демо-прогресс прежнего
+импорта остаётся в SQLite, но не смешивается с новым snapshot.
+
+## API и модули
+
+| Модуль | Ответственность |
+| --- | --- |
+| `engine/data_loader.py` | Строгая проверка исходных и дополнительных данных |
+| `engine/navigator.py` | Эффективные навыки, требования, допуск, сценарии, HR |
+| `engine/ai_layer.py` | Единственная граница модели, deadline, валидация, fallback, кэш |
+| `repository.py`, `schema.sql` | Сессии, версии, подтверждения, сохранение demo-состояния |
+| `application.py`, `access.py` | Авторизация, API, импорт, обработка ошибок |
+| `static/portal.*` | Русский интерфейс сотрудника и HR |
+| `contracts.py`, `contracts/contract.md` | Общие модели и формат обмена |
+
+Существующий трёхшаговый planner сохранён как совместимый модуль с тестами;
+активный продукт использует navigator и маршруты из одной–двух активностей.
+OpenAPI: `/docs`. Основные API: `/api/login`, `/api/session`, `/api/me`,
+`/api/me/recommendations?ai=false|true`, `/api/me/target`, `/api/me/completions`,
+`/api/hr/overview`, `/api/employees`, `/api/hr/import`.
+Ошибка единообразна: `{"error":{"code":"VALIDATION_ERROR","message":"…","details":[]}}`.
+401 — нет сессии; 403 — нет прав; 404 — неизвестный ID; 409 — конфликт версии/дубликат;
+422 — входные данные; 503 — приложение не готово, никогда не отказ LLM.
+
+## Проверки и воспроизводимое демо
+
+```powershell
+.\.venv\Scripts\python.exe -m unittest discover -s backend/tests -t . -v
+.\.venv\Scripts\python.exe scripts\demo_scenario.py --output var/demo_report.json
+.\.venv\Scripts\python.exe scripts\verify_demo.py --synthetic-ai
+```
+
+Первый запуск проверяет рискованные бизнес-правила, права, импорт, идемпотентность,
+вымышленные ID модели, таймаут и кэш. `demo_scenario.py` не вызывает модель и не меняет
+SQLite. `verify_demo.py` использует временную БД; флаг `--synthetic-ai` делает один
+реальный запрос на синтетическом примере. Последний отчёт: `var/verification.json`.
+
+Пошаговая демонстрация **E0015** и сложного профиля **E0137** — [docs/demo.md](docs/demo.md).
+Она показывает сравнение с ошибочным однофакторным выбором и однократное начисление.
+
+Измерение API на этом компьютере, Python 3.14.7, полный исходный датасет:
+профиль 8,9–13,6 мс; локальные рекомендации 8,1–8,7 мс; первый HR-запрос 359 мс;
+синтетический реальный ответ модели — 4,93 с (`mode=llm`, без кэша).
+Это FastAPI TestClient/серверный путь, не замер отрисовки браузера.
+Ограничения 2/10 секунд выполнены в этой проверке, не гарантируются для другой машины
+или провайдера. Для отдельного сетевого измерения API отдаёт Server-Timing.
+В текущей агентской среде доступного браузера нет, поэтому визуальная QA не выполнена.
+
+Не публикуйте `.env`, локальные коды, исходный датасет и SQLite. Используйте только
+синтетические профили, переданные организаторами. Раскрытый ранее ключ API нужно
+отозвать у провайдера; удаление его из рабочего файла не удаляет историю Git.

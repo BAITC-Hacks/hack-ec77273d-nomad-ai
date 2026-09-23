@@ -1,1 +1,1 @@
-﻿openAI: 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
+﻿Credentials belong only in environment variables or the ignored .env file. See .env.example.

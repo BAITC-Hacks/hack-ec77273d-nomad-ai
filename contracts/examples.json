@@ -1,0 +1,357 @@
+{
+  "employee": {
+    "employee_id": "E1",
+    "full_name": "Synthetic One",
+    "department": "Engineering",
+    "role": "Engineer",
+    "grade": "Junior",
+    "tenure_months": 21,
+    "work_format": "remote",
+    "preferred_language": "ru",
+    "career_goal": {
+      "target_role": "Engineer",
+      "target_grade": "Middle"
+    },
+    "last_review_date": "2026-09-01",
+    "skills": {
+      "LOW": 0,
+      "CORE": 2
+    },
+    "target": {
+      "role": "Engineer",
+      "grade": "Middle",
+      "source": "career_goal"
+    },
+    "revision": 0,
+    "as_of_date": "2026-10-01",
+    "completed_event_ids": []
+  },
+  "trajectory": {
+    "employee_id": "E1",
+    "revision": 0,
+    "target": {
+      "role": "Engineer",
+      "grade": "Middle",
+      "source": "career_goal"
+    },
+    "coverage": 44.44,
+    "critical_gap_units": 2,
+    "critical_blockers": 1,
+    "gaps": [
+      {
+        "skill_id": "LOW",
+        "name": "LOW",
+        "current": 0,
+        "required": 1,
+        "gap": 1,
+        "critical": false
+      },
+      {
+        "skill_id": "CORE",
+        "name": "CORE",
+        "current": 2,
+        "required": 4,
+        "gap": 2,
+        "critical": true
+      }
+    ],
+    "status": "active"
+  },
+  "recommendation_response": {
+    "employee_id": "E1",
+    "revision": 0,
+    "mode": "fallback",
+    "fallback_reason": "not_requested",
+    "recommendations": [
+      {
+        "route_id": "route_B_CORE_C_ADVANCED",
+        "event_id": "B_CORE",
+        "title": "B_CORE",
+        "action": "start",
+        "score": 7.0928,
+        "reason": "Цель: Engineer, Middle. Первый шаг уменьшает разрыв: CORE: 2 → 3, требование 4. Истории участия в этом формате недостаточно для вывода о предпочтениях.",
+        "factors": [
+          {
+            "fact_id": "grade",
+            "category": "grade",
+            "text": "Текущий грейд: Junior."
+          },
+          {
+            "fact_id": "target",
+            "category": "target",
+            "text": "Цель: Engineer, Middle."
+          },
+          {
+            "fact_id": "route_B_CORE_C_ADVANCED_gap",
+            "category": "gap",
+            "text": "Первый шаг уменьшает разрыв: CORE: 2 → 3, требование 4."
+          },
+          {
+            "fact_id": "route_B_CORE_C_ADVANCED_history",
+            "category": "history",
+            "text": "Истории участия в этом формате недостаточно для вывода о предпочтениях."
+          },
+          {
+            "fact_id": "route_B_CORE_C_ADVANCED_eligibility",
+            "category": "eligibility",
+            "text": "Роль, грейд и предварительные требования проверены. Формат: self_paced; длительность: 2 ч."
+          },
+          {
+            "fact_id": "route_B_CORE_C_ADVANCED_impact",
+            "category": "impact",
+            "text": "Остаток критических разрывов после первого шага: 1."
+          }
+        ],
+        "impacts": [
+          {
+            "skill_id": "CORE",
+            "before": 2,
+            "after": 3,
+            "gain_applied": 1,
+            "max_level": 4,
+            "required": 4
+          },
+          {
+            "skill_id": "EXTRA",
+            "before": 0,
+            "after": 1,
+            "gain_applied": 1,
+            "max_level": 3,
+            "required": null
+          }
+        ],
+        "progress_before": 44.44,
+        "progress_after": 66.67,
+        "critical_gap_before": 2,
+        "critical_gap_after": 1,
+        "steps": [
+          {
+            "event_id": "B_CORE",
+            "title": "B_CORE",
+            "format": "self_paced",
+            "duration_hours": 2,
+            "planned_start": "2026-10-01",
+            "planned_end": "2026-10-02",
+            "impacts": [
+              {
+                "skill_id": "CORE",
+                "before": 2,
+                "after": 3,
+                "gain_applied": 1,
+                "max_level": 4,
+                "required": 4
+              },
+              {
+                "skill_id": "EXTRA",
+                "before": 0,
+                "after": 1,
+                "gain_applied": 1,
+                "max_level": 3,
+                "required": null
+              }
+            ],
+            "coverage_after": 66.67,
+            "critical_gap_units_after": 1
+          },
+          {
+            "event_id": "C_ADVANCED",
+            "title": "C_ADVANCED",
+            "format": "self_paced",
+            "duration_hours": 2,
+            "planned_start": "2026-10-02",
+            "planned_end": "2026-10-03",
+            "impacts": [
+              {
+                "skill_id": "CORE",
+                "before": 3,
+                "after": 4,
+                "gain_applied": 1,
+                "max_level": 4,
+                "required": 4
+              }
+            ],
+            "coverage_after": 88.89,
+            "critical_gap_units_after": 0
+          }
+        ],
+        "unlocked_event_ids": [
+          "C_ADVANCED"
+        ]
+      },
+      {
+        "route_id": "route_A_LOW_B_CORE",
+        "event_id": "A_LOW",
+        "title": "A_LOW",
+        "action": "start",
+        "score": 3.2817,
+        "reason": "Цель: Engineer, Middle. Первый шаг уменьшает разрыв: LOW: 0 → 1, требование 1. Истории участия в этом формате недостаточно для вывода о предпочтениях.",
+        "factors": [
+          {
+            "fact_id": "grade",
+            "category": "grade",
+            "text": "Текущий грейд: Junior."
+          },
+          {
+            "fact_id": "target",
+            "category": "target",
+            "text": "Цель: Engineer, Middle."
+          },
+          {
+            "fact_id": "route_A_LOW_B_CORE_gap",
+            "category": "gap",
+            "text": "Первый шаг уменьшает разрыв: LOW: 0 → 1, требование 1."
+          },
+          {
+            "fact_id": "route_A_LOW_B_CORE_history",
+            "category": "history",
+            "text": "Истории участия в этом формате недостаточно для вывода о предпочтениях."
+          },
+          {
+            "fact_id": "route_A_LOW_B_CORE_eligibility",
+            "category": "eligibility",
+            "text": "Роль, грейд и предварительные требования проверены. Формат: self_paced; длительность: 30 ч."
+          },
+          {
+            "fact_id": "route_A_LOW_B_CORE_impact",
+            "category": "impact",
+            "text": "Остаток критических разрывов после первого шага: 2."
+          }
+        ],
+        "impacts": [
+          {
+            "skill_id": "LOW",
+            "before": 0,
+            "after": 1,
+            "gain_applied": 1,
+            "max_level": 5,
+            "required": 1
+          }
+        ],
+        "progress_before": 44.44,
+        "progress_after": 55.56,
+        "critical_gap_before": 2,
+        "critical_gap_after": 2,
+        "steps": [
+          {
+            "event_id": "A_LOW",
+            "title": "A_LOW",
+            "format": "self_paced",
+            "duration_hours": 30,
+            "planned_start": "2026-10-01",
+            "planned_end": "2026-10-16",
+            "impacts": [
+              {
+                "skill_id": "LOW",
+                "before": 0,
+                "after": 1,
+                "gain_applied": 1,
+                "max_level": 5,
+                "required": 1
+              }
+            ],
+            "coverage_after": 55.56,
+            "critical_gap_units_after": 2
+          },
+          {
+            "event_id": "B_CORE",
+            "title": "B_CORE",
+            "format": "self_paced",
+            "duration_hours": 2,
+            "planned_start": "2026-10-16",
+            "planned_end": "2026-10-17",
+            "impacts": [
+              {
+                "skill_id": "CORE",
+                "before": 2,
+                "after": 3,
+                "gain_applied": 1,
+                "max_level": 4,
+                "required": 4
+              },
+              {
+                "skill_id": "EXTRA",
+                "before": 0,
+                "after": 1,
+                "gain_applied": 1,
+                "max_level": 3,
+                "required": null
+              }
+            ],
+            "coverage_after": 77.78,
+            "critical_gap_units_after": 1
+          }
+        ],
+        "unlocked_event_ids": []
+      }
+    ],
+    "baseline": {
+      "event_id": "A_LOW",
+      "skill_id": "LOW",
+      "reason": "Сравнение с простым выбором по самому низкому требуемому навыку; такой выбор не учитывает критичность, историю формата и весь маршрут."
+    },
+    "no_step_reason": null
+  },
+  "hr_overview": {
+    "as_of_date": "2026-10-01",
+    "total_employees": 2,
+    "skill_gaps": [
+      {
+        "skill_id": "CORE",
+        "name": "CORE",
+        "affected_count": 2,
+        "eligible_population": 2,
+        "mean_gap": 2.0
+      },
+      {
+        "skill_id": "LOW",
+        "name": "LOW",
+        "affected_count": 2,
+        "eligible_population": 2,
+        "mean_gap": 1.0
+      }
+    ],
+    "no_next_step": [],
+    "activities": [
+      {
+        "event_id": "A_LOW",
+        "title": "A_LOW",
+        "mandatory": false,
+        "unique_participants": 0,
+        "status_counts": {},
+        "completed_records": 0,
+        "total_records": 0,
+        "completion_rate": null
+      },
+      {
+        "event_id": "B_CORE",
+        "title": "B_CORE",
+        "mandatory": false,
+        "unique_participants": 0,
+        "status_counts": {},
+        "completed_records": 0,
+        "total_records": 0,
+        "completion_rate": null
+      },
+      {
+        "event_id": "C_ADVANCED",
+        "title": "C_ADVANCED",
+        "mandatory": false,
+        "unique_participants": 0,
+        "status_counts": {},
+        "completed_records": 0,
+        "total_records": 0,
+        "completion_rate": null
+      },
+      {
+        "event_id": "M_MANDATORY",
+        "title": "M_MANDATORY",
+        "mandatory": true,
+        "unique_participants": 0,
+        "status_counts": {},
+        "completed_records": 0,
+        "total_records": 0,
+        "completion_rate": null
+      }
+    ]
+  }
+}

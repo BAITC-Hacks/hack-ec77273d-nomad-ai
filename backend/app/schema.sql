@@ -51,5 +51,28 @@ CREATE TABLE IF NOT EXISTS development_plans (
     created_at TEXT NOT NULL
 );
 
-PRAGMA user_version = 2;
+CREATE TABLE IF NOT EXISTS employee_state (
+    import_id TEXT NOT NULL REFERENCES imports(import_id),
+    employee_id TEXT NOT NULL,
+    target_json TEXT,
+    revision INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY(import_id, employee_id)
+);
+CREATE TABLE IF NOT EXISTS employee_progress (
+    completion_id TEXT PRIMARY KEY,
+    import_id TEXT NOT NULL REFERENCES imports(import_id),
+    employee_id TEXT NOT NULL,
+    event_id TEXT NOT NULL,
+    occurrence_key TEXT NOT NULL,
+    event_session_key TEXT,
+    continued_record_id TEXT,
+    date TEXT NOT NULL,
+    idempotency_key TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE(import_id, employee_id, idempotency_key),
+    UNIQUE(import_id, employee_id, event_id, occurrence_key)
+);
+CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+
+PRAGMA user_version = 3;
 COMMIT;

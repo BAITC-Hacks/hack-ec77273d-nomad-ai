@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Nomad AI — Development plans</title>
+  <style>
+    body { max-width: 960px; margin: 40px auto; padding: 0 20px; background: #f4f7f6; color: #193d32; font: 16px/1.6 system-ui; }
+    article, form { background: white; padding: 24px; border: 1px solid #d8e2dc; border-radius: 12px; margin: 16px 0; }
+    button, select { padding: 12px; font: inherit; border-radius: 6px; border: 1px solid #bacdc2; max-width: 100%; }
+    button { background: #176b50; color: white; cursor: pointer; }
+    button:disabled { opacity: .5; cursor: wait; }
+    h1, h2 { line-height: 1.2; } small { color: #54685d; }
+    #status { min-height: 28px; } a { color: #176b50; }
+  </style>
+</head>
+<body>
+  <h1>Your next development steps</h1>
+  <p>Plans use your skills, career target, participation history and the company event catalog.</p>
+  <form id="planner">
+    <label for="employee">Employee</label>
+    <select id="employee" required></select>
+    <label for="provider">AI provider</label>
+    <select id="provider">
+      <option value="">Server setting</option>
+      <option value="openai">OpenAI</option>
+      <option value="nvidia">NVIDIA</option>
+      <option value="none">Local rules</option>
+    </select>
+    <button id="generate" disabled>Generate and save plan</button>
+    <button id="history" type="button" disabled>Show saved plans</button>
+  </form>
+  <p id="status" role="status" aria-live="polite">Loading employees…</p>
+  <section id="result"></section>
+  <small>Skill coverage does not guarantee promotion. Plans are forecasts; generating a plan does not complete activities or change grades. <a href="/docs">API documentation</a></small>
+  <script>
+    const employee = document.getElementById("employee");
+    const result = document.getElementById("result");
+    const status = document.getElementById("status");
+    const buttons = [...document.querySelectorAll("button")];
+    const aiStatus = value => ({
+      missing_api_key: "Add the selected provider's API key to the project root .env file, then restart the server.",
+      missing_model: "Set the selected provider's model ID in the project root .env file, then restart the server.",
+      disabled: "AI is disabled. Choose OpenAI or NVIDIA to enable model explanations."
+    }[value] || value.replaceAll("_", " "));
+    const escapeHtml = value => String(value).replace(/[&<>"']/g, c =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+    async function api(path, options) {
+      const response = await fetch(path, options);
+      const body = await response.json();
+      if (!response.ok) throw new Error(typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail));
+      return body;
+    }
+
+    function render(record) {
+      const plan = record.result;
+      const percentage = value => value === null ? "No requirements" : value.toFixed(1) + "%";
+      return `<article>
+        <h2>${escapeHtml(plan.employee_name)} → ${escapeHtml(plan.target.target_grade)} ${escapeHtml(plan.target.target_role)}</h2>
+        <p>Skill requirements coverage: ${percentage(plan.before.coverage)} → ${percentage(plan.after.coverage)}</p>
+        <small>Saved ${escapeHtml(record.created_at)} · Snapshot ${escapeHtml(plan.as_of_date)}</small>
+        <p>Explanation source: ${escapeHtml(plan.explanation_source)}
+          ${plan.ai?.reason ? " · Local fallback: " + escapeHtml(aiStatus(plan.ai.reason)) : ""}</p>
+        ${plan.summary ? `<p>${escapeHtml(plan.summary)}</p>` : ""}
+        ${plan.steps.map(step => `<article>
+          <h3>${step.step}. ${escapeHtml(step.title)}</h3>
+          <p>${escapeHtml(step.explanation)}</p>
+          <small>${escapeHtml(step.action)} · ${step.duration_hours} hours · ${escapeHtml(step.start_date)} to ${escapeHtml(step.estimated_end_date)} (estimate)</small>
+        </article>`).join("")}
+        ${plan.limitation ? `<p>${escapeHtml(plan.limitation)}</p>` : ""}
+        <details><summary>How this plan was chosen</summary>
+          <p>Local rules validate and score feasible routes. When enabled, the selected AI provider receives candidate tasks and relevant skill gaps, chooses among similarly scored routes and explains each step. Names and full profiles are not sent.</p>
+          <ul>${plan.assumptions.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+        </details>
+      </article>`;
+    }
+
+    async function run(action) {
+      buttons.forEach(button => button.disabled = true);
+      employee.disabled = true;
+      status.textContent = "Working…";
+      try { await action(); }
+      catch (error) { status.textContent = error.message; }
+      finally {
+        buttons.forEach(button => button.disabled = false);
+        employee.disabled = false;
+      }
+    }
+
+    document.getElementById("planner").addEventListener("submit", event => {
+      event.preventDefault();
+      run(async () => {
+        const provider = document.getElementById("provider").value;
+        const query = provider ? "?provider=" + encodeURIComponent(provider) : "";
+        const record = await api("/api/employees/" + encodeURIComponent(employee.value) + "/plans" + query, { method: "POST" });
+        result.innerHTML = render(record);
+        status.textContent = "Plan saved to the local database.";
+      });
+    });
+    document.getElementById("history").addEventListener("click", () => run(async () => {
+      const saved = await api("/api/employees/" + encodeURIComponent(employee.value) + "/plans");
+      result.innerHTML = saved.items.map(render).join("");
+      status.textContent = saved.items.length ? "Saved plans loaded." : "No saved plans yet.";
+    }));
+    (async () => {
+      try {
+        let offset = 0;
+        let total;
+        do {
+          const page = await api("/api/employees?limit=200&offset=" + offset);
+          for (const person of page.items) employee.add(new Option(person.full_name + " (" + person.employee_id + ")", person.employee_id));
+          offset += page.items.length;
+          total = page.total;
+        } while (offset < total);
+        buttons.forEach(button => button.disabled = !total);
+        status.textContent = total ? "Choose an employee to begin." : "No employees available.";
+      } catch (error) { status.textContent = error.message; }
+    })();
+  </script>
+</body>
+</html>

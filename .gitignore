@@ -5,6 +5,7 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .env
+/api/Apis.txt
 data/*
 backend/Dataset/*.json
 backend/Dataset/*.csv
