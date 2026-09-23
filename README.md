@@ -85,6 +85,15 @@ Read endpoints include `/api/health`, `/api/import`, `/api/employees`,
 This prototype API is for the closed local hackathon environment; do not expose
 it publicly because these endpoints return employee profile and history data.
 
+The local frontend has separate pages at `/employee`, `/hr` and `/boss`. The
+employee page opens one profile by employee ID; HR can browse the directory and
+open each person's plan; the boss page shows organization totals and learning
+activity. Each person plan shows up to three available routes with their actual
+course steps. These are presentation routes for the localhost demo, not an
+authenticated production authorization system. The routes API is
+`/api/employees/{employee_id}/routes`; organization aggregates are at
+`/api/hr/overview`.
+
 ## AI adapter lab
 
 Start the local API, then open `http://127.0.0.1:8000/admin/ai`. The console

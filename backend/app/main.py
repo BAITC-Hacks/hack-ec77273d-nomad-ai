@@ -17,6 +17,7 @@ from .schemas import HealthResponse, ImportResponse
 load_dotenv(Path(__file__).resolve().parents[2] / ".env", override=False)
 
 from .engine.ai_layer import rank_and_explain
+from .engine.planner import generate_plan
 
 
 def _paths():
@@ -40,6 +41,18 @@ def _paths():
 data_dir, database_path = _paths()
 repository = Repository(database_path)
 app = FastAPI(title="Nomad AI API", version="1.0.0")
+
+
+def _portal():
+    return FileResponse(Path(__file__).with_name("static") / "portal.html")
+
+
+@app.get("/", include_in_schema=False)
+@app.get("/employee", include_in_schema=False)
+@app.get("/hr", include_in_schema=False)
+@app.get("/boss", include_in_schema=False)
+def portal():
+    return _portal()
 
 
 class AITestRequest(BaseModel):
@@ -117,12 +130,130 @@ def list_employees(q: str | None = None, limit: int = Query(50, ge=1, le=200),
     return {"total": len(rows), "items": rows[offset:offset + limit]}
 
 
+@app.get("/api/hr/overview")
+def hr_overview():
+    employees = list(dataset.employees_by_id.values())
+    departments = {}
+    grades = {}
+    roles = {}
+    for row in employees:
+        department = row.get("department", "Unknown")
+        departments[department] = departments.get(department, 0) + 1
+        grades[row["grade"]] = grades.get(row["grade"], 0) + 1
+        roles[row["role"]] = roles.get(row["role"], 0) + 1
+    by_event = {}
+    for employee_id, history in dataset.history_by_employee.items():
+        for record in history:
+            item = by_event.setdefault(record["event_id"], {"participants": set(), "completed": 0,
+                                                              "records": 0})
+            item["participants"].add(employee_id)
+            item["records"] += 1
+            item["completed"] += record["status"] == "completed"
+    activities = []
+    for event_id, event in dataset.events_by_id.items():
+        activity = by_event.get(event_id, {"participants": set(), "completed": 0, "records": 0})
+        activities.append({"event_id": event_id, "title": event["title"],
+                           "participants": len(activity["participants"]),
+                           "completed": activity["completed"], "records": activity["records"],
+                           "mandatory": event["mandatory"]})
+    return {
+        "as_of_date": dataset.as_of_date.isoformat(), "total_employees": len(employees),
+        "total_events": len(dataset.events_by_id), "departments": departments,
+        "grades": grades, "roles": roles,
+        "activities": sorted(activities, key=lambda x: (-x["participants"], x["event_id"]))[:8],
+    }
+
+
 @app.get("/api/employees/{employee_id}")
 def get_employee(employee_id: str):
     employee = dataset.employees_by_id.get(employee_id)
     if employee is None:
         raise HTTPException(status_code=404, detail="Employee not found")
     return employee
+
+
+@app.get("/api/employees/{employee_id}/routes")
+def employee_routes(employee_id: str):
+    if employee_id not in dataset.employees_by_id:
+        raise HTTPException(status_code=404, detail="Employee not found")
+    plan = generate_plan(dataset, employee_id)
+    employee = dataset.employees_by_id[employee_id]
+    candidates = plan.pop("_candidate_routes", [])[:3]
+    if not candidates:
+        return {"employee": {"employee_id": employee_id,
+                             "full_name": employee.get("full_name", employee_id),
+                             "department": employee.get("department"), "role": employee["role"],
+                             "grade": employee["grade"]},
+                "target": plan["target"], "routes": [], "ai": {
+                    "mode": "fallback", "fallback_reason": "no_available_route"},
+                "no_route_reason": plan["status"]}
+
+    route_rows = []
+    for index, candidate in enumerate(candidates, 1):
+        steps = candidate["steps"]
+        route_id = f"route_{index}"
+        route_rows.append({
+            "route_id": route_id,
+            "title": steps[0]["title"],
+            "summary": " → ".join(step["title"] for step in steps)[:300],
+            "courses": [{"event_id": step["event_id"], "title": step["title"],
+                         "format": step["format"], "duration_hours": step["duration_hours"],
+                         "start_date": step["start_date"],
+                         "estimated_end_date": step["estimated_end_date"],
+                         "action": step["action"], "skill_changes": step["skill_changes"]}
+                        for step in steps],
+            "utility": candidate["utility"],
+        })
+
+    gaps = plan["before"].get("gaps", {})
+    gap_facts = []
+    for skill_id, amount in sorted(gaps.items(), key=lambda pair: (-pair[1], pair[0])):
+        if amount <= 0:
+            continue
+        skill_name = dataset.skills_by_id.get(skill_id, {}).get("name", skill_id)
+        gap_facts.append({"fact_id": f"gap_{skill_id}", "category": "gap",
+                          "text": f"Есть разрыв по навыку {skill_name}."})
+        if len(gap_facts) == 2:
+            break
+    if not gap_facts:
+        gap_facts.append({"fact_id": "gap_none", "category": "gap",
+                          "text": "По рассчитанным требованиям целевого профиля разрывов нет."})
+    history = [row for row in dataset.history_by_employee.get(employee_id, [])
+               if row["date"] <= dataset.as_of_date.isoformat()]
+    completed_count = sum(row["status"] == "completed" for row in history)
+    history_text = (f"В истории {completed_count} завершённых записей о развитии."
+                    if history else "История участия ограничена; причин пропусков нет в данных.")
+    evidence = [
+        {"fact_id": "grade", "category": "grade", "text": f"Текущий грейд — {employee['grade']}."},
+        {"fact_id": "target", "category": "target",
+         "text": f"Целевая роль — {plan['target']['target_role']}, грейд {plan['target']['target_grade']}."},
+        *gap_facts,
+        {"fact_id": "history_aggregate", "category": "history", "text": history_text},
+    ]
+    ai_result = rank_and_explain({
+        "employee_id": employee_id, "revision": 1, "role": employee["role"],
+        "grade": employee["grade"], "target": plan["target"], "facts": evidence,
+        "routes": [{key: route[key] for key in ("route_id", "title", "summary")}
+                   for route in route_rows],
+        "rerankable_route_ids": [route["route_id"] for route in route_rows],
+    })
+    explanations = {row["route_id"]: row for row in ai_result["explanations"]}
+    by_id = {route["route_id"]: route for route in route_rows}
+    ordered = []
+    for route_id in ai_result["ordered_route_ids"]:
+        route = by_id[route_id]
+        route["explanation"] = explanations.get(route_id, {}).get(
+            "text", "Маршрут сформирован по данным навыков и доступных занятий.")
+        ordered.append(route)
+    return {
+        "employee": {"employee_id": employee_id,
+                     "full_name": employee.get("full_name", employee_id),
+                     "department": employee.get("department"), "role": employee["role"],
+                     "grade": employee["grade"]},
+        "target": plan["target"], "coverage": plan["before"], "routes": ordered,
+        "ai": {"mode": ai_result["mode"], "fallback_reason": ai_result["fallback_reason"]},
+        "as_of_date": plan["as_of_date"],
+    }
 
 
 @app.get("/api/employees/{employee_id}/history")
